@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import imageio
+import imageio.v2 as imageio
 import io
 
 def simulate_heat_diffusion(plate_size, steps, alpha, source_pos):
@@ -28,13 +28,16 @@ def simulate_heat_diffusion(plate_size, steps, alpha, source_pos):
     
     return output
 
-def generate_data(n_samples, alpha_min, alpha_max, plate_size=32, steps=100):
+def generate_data(n_samples, alpha_min, alpha_max, plate_size=32, steps=100, train=True):
     data = []
     alphas = []
     source_positions = []
     for _ in range(n_samples):
         alpha = np.random.uniform(alpha_min, alpha_max)
-        source_pos = (np.random.randint(1, plate_size - 1), np.random.randint(1, plate_size - 1))
+        if train:
+            source_pos = (np.random.randint(1, plate_size - 1), np.random.randint(1, plate_size // 2))
+        else:
+            source_pos = (np.random.randint(1, plate_size - 1), np.random.randint(1, plate_size - 1))
         sample_data = simulate_heat_diffusion(plate_size, steps, alpha, source_pos)
         data.append(sample_data)
         alphas.append(alpha)
@@ -113,47 +116,67 @@ def add_gaussian_noise(data, mean=0, std_dev=1):
     noisy_data = data + noise
     return noisy_data
 
-def add_pepper_noise(data, pepper_prob=0.01):
+def add_pepper_noise(data, square_size=2, pepper_prob=0.01):
     noisy_data = np.copy(data)
-    num_pepper = np.ceil(pepper_prob * data.size)
+    num_samples, num_timesteps, height, width = data.shape
 
-    # Get indices for salt and pepper
-    coords_pepper = [np.random.randint(0, i - 1, int(num_pepper)) for i in data.shape]
-    noisy_data[tuple(coords_pepper)] = 0
+    for sample_index in range(num_samples):
+        num_squares = int(pepper_prob * (height * width) / (square_size * square_size))
+        for _ in range(num_squares):
+            t = np.random.randint(0, num_timesteps)
+            i = np.random.randint(0, height - square_size + 1)
+            j = np.random.randint(0, width - square_size + 1)
+            noisy_data[sample_index, :, i:i + square_size, j:j + square_size] = 0
 
     return noisy_data
 
-
 def main():
-    n_samples = 100  # Number of samples to generate
+    n_samples_train = 80  # Number of training samples
+    n_samples_val = 20    # Number of validation samples
     alpha_min = 0.05
     alpha_max = 0.2
-   
 
-    # Generate clean data
-    data, alphas, source_positions = generate_data(n_samples, alpha_min, alpha_max)
+    # Generate training data (left half start points)
+    train_data, train_alphas, train_source_positions = generate_data(n_samples_train, alpha_min, alpha_max, train=True)
+    # Generate validation data (start points all over the plate)
+    val_data, val_alphas, val_source_positions = generate_data(n_samples_val, alpha_min, alpha_max, train=False)
 
-    # Save the data
-    filename = 'heat_diffusion_data_100.npz'
-    save_data(data, alphas, source_positions, filename)
+
+    # add noise
+    # Save the training data
+    train_filename = 'heat_diffusion_train_data_clean.npz'
+    save_data(train_data, train_alphas, train_source_positions, train_filename)
+    # Save the validation data
+    val_filename = 'heat_diffusion_val_data_clean.npz'
+    save_data(val_data, val_alphas, val_source_positions, val_filename)
+
 
     # Load and plot one sample
-    loaded_data, loaded_alphas, loaded_source_positions = load_data(filename)
+    loaded_data, loaded_alphas, loaded_source_positions = load_data(train_filename)
     plot_random_samples(loaded_data, loaded_alphas, save_path= "plots/clean_summary.png")  
-    plot_random_samples_as_gifs(loaded_data, loaded_alphas, n_samples=1, save_dir="gifs/clean")
+    #plot_random_samples_as_gifs(loaded_data, loaded_alphas, n_samples=1, save_dir="gifs/clean")
 
-    # Add noise to the data
-    noisy_data = add_gaussian_noise(data, mean=0, std_dev=0.01)
-    noisy_data = add_pepper_noise(noisy_data, pepper_prob=0.01)
+    noisy_train = add_gaussian_noise(train_data, mean=0, std_dev=0.01)
+    noisy_train = add_pepper_noise(noisy_train, pepper_prob=0.01)
 
-    # Save the noisy data
-    noisy_filename = 'heat_diffusion_noisy_data_100.npz'
-    save_data(noisy_data, loaded_alphas, loaded_source_positions, noisy_filename)
+    noisy_val = add_gaussian_noise(val_data, mean=0, std_dev=0.01)
+    noisy_val = add_pepper_noise(noisy_val, pepper_prob=0.01)
+
+    # Save the noisy training data
+    noisy_train_filename = 'heat_diffusion_train_data_noisy.npz'
+    save_data(noisy_train, train_alphas, train_source_positions, noisy_train_filename)
+    # Save the noisy validation data
+    noisy_val_filename = 'heat_diffusion_val_data_noisy.npz'
+    save_data(noisy_val, val_alphas, val_source_positions, noisy_val_filename)
+
 
     # Load and plot one sample
-    loaded_data, loaded_alphas, loaded_source_positions = load_data(noisy_filename)
+    loaded_data, loaded_alphas, loaded_source_positions = load_data(noisy_train_filename)
     plot_random_samples(loaded_data, loaded_alphas, save_path= "plots/noisy_summary.png")  
-    plot_random_samples_as_gifs(loaded_data, loaded_alphas, n_samples=1, save_dir="gifs/noisy")
+    #plot_random_samples_as_gifs(loaded_data, loaded_alphas, n_samples=1, save_dir="gifs/noisy")
+
+
+
 
 if __name__ == "__main__":
     main()

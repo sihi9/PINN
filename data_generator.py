@@ -57,7 +57,7 @@ def plot_random_samples(data, alphas, n_samples=5, times=[0, 25, 50, 75], save_p
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
-    # Choose up to 5 random samples to plot
+    # Choose random samples
     indices = np.random.choice(range(data.shape[0]), min(n_samples, data.shape[0]), replace=False)
     fig, axes = plt.subplots(len(indices), len(times), figsize=(20, 5 * len(indices)), squeeze=False)
 
@@ -65,8 +65,6 @@ def plot_random_samples(data, alphas, n_samples=5, times=[0, 25, 50, 75], save_p
         for i, time in enumerate(times):
             ax = axes[idx, i]
             ax.imshow(data[data_idx][time], cmap='hot', interpolation='nearest')
-            #ax.axis('off')
-            # Set alpha as a y-label to the left of each row
             if i == 0:
                 ax.set_ylabel(f'α={alphas[data_idx]:.3f}', fontsize=12, rotation=0, labelpad=40, verticalalignment='center')
     
@@ -141,8 +139,6 @@ def main():
     # Generate validation data (start points all over the plate)
     val_data, val_alphas, val_source_positions = generate_data(n_samples_val, alpha_min, alpha_max, train=False)
 
-
-    # add noise
     # Save the training data
     train_filename = 'heat_diffusion_train_data_clean.npz'
     save_data(train_data, train_alphas, train_source_positions, train_filename)
@@ -156,6 +152,8 @@ def main():
     plot_random_samples(loaded_data, loaded_alphas, save_path= "plots/clean_summary.png")  
     #plot_random_samples_as_gifs(loaded_data, loaded_alphas, n_samples=1, save_dir="gifs/clean")
 
+
+    # add noise
     noisy_train = add_gaussian_noise(train_data, mean=0, std_dev=0.01)
     noisy_train = add_pepper_noise(noisy_train, pepper_prob=0.01)
 
@@ -174,8 +172,6 @@ def main():
     loaded_data, loaded_alphas, loaded_source_positions = load_data(noisy_train_filename)
     plot_random_samples(loaded_data, loaded_alphas, save_path= "plots/noisy_summary.png")  
     #plot_random_samples_as_gifs(loaded_data, loaded_alphas, n_samples=1, save_dir="gifs/noisy")
-
-
 
 
 if __name__ == "__main__":
